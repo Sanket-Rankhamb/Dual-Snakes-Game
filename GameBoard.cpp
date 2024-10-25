@@ -1,9 +1,10 @@
 #include "GameBoard.h"
 #include <iostream>
-#include "SystemFunctions.h"
+#include "ConsoleFunctions.h"
 #include "Macros.h"
 #include <stdlib.h>
 #include <time.h>
+#include <future>
 
 using namespace std;
 
@@ -63,7 +64,7 @@ void GameBoard::drawBorder() {
     setCursorPosition(minX, maxY+1);
 }
 
-void GameBoard::drawSnake(Snake& snake){
+void GameBoard::drawSnake(Snake& snake, int color){
     
     // Erase the tail position of snake
     int x = snake.getOldTailX();
@@ -84,8 +85,7 @@ void GameBoard::drawSnake(Snake& snake){
     x = snake.getHeadX();
 	y = snake.getHeadY();
 	setCursorPosition(x, y);
-    cout << (char) HEAD;
-    
+    cout << (char) HEAD;    
 }
 
 Snake& GameBoard::getSnake(int index){
@@ -98,6 +98,17 @@ bool GameBoard::isBorderCollision(Snake& snake){
 	if(x > maxX || y > maxY) return 1;
 	else if( x < minX || y < minY ) return 1;
 	return 0;
+}
+
+bool GameBoard::isSnakeToSnakeCollision(Snake& snake, Snake& otherSnake){
+
+	if( otherSnake.isPositionOccupied(snake.getHeadX(), snake.getHeadY() ) ) return 1;
+	else return 0;
+}
+
+bool GameBoard::isSnakeColide(Snake& snake, Snake& otherSnake){
+	
+    return isBorderCollision(snake) || isSnakeToSnakeCollision(snake, otherSnake);
 }
 
 int GameBoard::generateFood(){
@@ -132,7 +143,9 @@ bool GameBoard::isSnakeEatingFood(Snake& snake){
 bool GameBoard::isFreePosition(int x, int y){
 	if( x < minX || x > maxX) return 0;
 	else if( y < minY || y > maxY) return 0;
-	else return !( snake[0].isPositionOccupied(x, y) || snake[1].isPositionOccupied(x, y) );
+	
+	future<bool> positionOccupiedFuture = async( &Snake::isPositionOccupied, snake[0], x, y);
+	return ! ( snake[1].isPositionOccupied(x, y) || positionOccupiedFuture.get() );
 }
 
 int GameBoard::getFreeDirectionForSnake(Snake& snake){
@@ -239,11 +252,6 @@ int GameBoard::getAutoDirection(Snake& snake){
 	return dir;
 }
 
-bool GameBoard::isSnakeToSnakeCollision(Snake& snake, Snake& otherSnake){
-
-	if( otherSnake.isPositionOccupied(snake.getHeadX(), snake.getHeadY() ) ) return 1;
-	else return 0;
-}
 
 
 

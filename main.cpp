@@ -1,8 +1,10 @@
 #include <iostream>
 #include <conio.h>
+#include <windows.h>
 #include "GameBoard.h"
 #include "Macros.h"
-#include "SystemFunctions.h"
+#include "ConsoleFunctions.h"
+#include <thread>
 using namespace std;
 
 void welcome();
@@ -10,13 +12,19 @@ void header();
 void status( int yourScore, int opponentScore, int gameLoopStatus, bool autoPilot, int colisionStatus = false);
 bool gameLoop();
 
+void handleUserInput();
 void moveSnake(Snake& snake, int direction);
 void drawSnake(GameBoard& gameBoard, Snake& snake, int color = DEFAULT_COLOR);
 void drawFood(GameBoard& gameBoard, int color = FOOD_COLOR);
-bool isSnakeColide(GameBoard& gameBoard, Snake& snake, Snake& otherSnake);
-bool isSnakeEatingFood(GameBoard& gameBoard, Snake& snake, Snake& otherSnake);
 
-const int SleepTime = 130;
+int direction;
+bool pause;
+bool autoPilot;
+int score1;
+int score2;
+bool win;
+int colisionStatus;
+const int SleepTime = 180;
 
 int main() {
 	
@@ -47,93 +55,48 @@ bool gameLoop() {
 	
     header();
     
-    GameBoard gameBoard( MIN_X, MIN_Y, MAX_X, MAX_Y );
-    gameBoard.drawBorder();
-    Snake& snake1 = gameBoard.getSnake(0);
-    Snake& snake2 = gameBoard.getSnake(1);
-    
-    drawSnake(gameBoard, snake1, PLAYER_SNAKE_COLOR);
-    drawSnake(gameBoard, snake2, OPPONENT_SNAKE_COLOR);
-    gameBoard.generateFood();
-    drawFood(gameBoard);
+    GameBoard gameBoard = GameBoard(MIN_X, MIN_Y, MAX_X, MAX_Y);
+    Snake &snake1 = gameBoard.getSnake(0);
+    Snake &snake2 = gameBoard.getSnake(1);
+    direction = snake1.getDirection();
+    pause = true;
+    autoPilot = false;
+    score1 = 0;
+    score2 = 0;
+    win = false;
+    colisionStatus = 0;
 
-    int direction = snake1.getDirection();
-    bool pause = true;
-    bool autoPilot = false;
-    int score1 = 0;
-    int score2 = 0;
-    bool win = false;
-    int colisionStatus = 0;
+	gameBoard.drawBorder();
+	drawSnake(gameBoard, snake1, PLAYER_COLOR);
+	drawSnake(gameBoard, snake2, OPPONENT_COLOR);
+	gameBoard.generateFood();
+	drawFood(gameBoard);
     
     status(score1, score2, pause, autoPilot);
 
     while ( true ) {
     	
-        if ( kbhit() ) {
-            char c = getch();
-            bool wasPaused = pause;
-            pause = false;
-			
-            if ( c == 'e' || c == 'E' ) {
-                pause = true;
-                autoPilot = true;
-            }
-            else if ( c == 'q' || c == 'Q' ) {
-                autoPilot = false;
-                pause = true;
-            }
-            else if( c == 'o' || c == 'O' ){
-            	system("cls"); 
-            	exit(0);
-			}
-            else {
-                switch ( c ) {
-                    case 'd':
-                    case 'D':
-                        if ( direction != LEFT ) direction = RIGHT;
-                        else pause = true;
-                        break;
-                    case 'a':
-                    case 'A':
-                        if ( direction != RIGHT ) direction = LEFT;
-                        else pause = true;
-                        break;
-                    case 'w':
-                    case 'W':
-                        if ( direction != DOWN ) direction = UP;
-                        else pause = true;
-                        break;
-                    case 's':
-                    case 'S':
-                        if ( direction != UP ) direction = DOWN;
-                        else pause = true;
-                        break;
-                    default:
-                        pause = wasPaused;
-                }
-            }
-        }
+        if ( kbhit() ) handleUserInput();
 
-        if ( autoPilot ) {
-            direction = gameBoard.getAutoDirection(snake1);
-        }
+        if (autoPilot) direction = gameBoard.getAutoDirection(snake1);
         
         int opponentDirection = gameBoard.getAutoDirection(snake2);
 
         if ( !pause ) {
         	
-			moveSnake(snake1, direction);
+			thread m1 = thread(moveSnake, ref(snake1), direction ); //moveSnake(snake1, direction);
 			moveSnake(snake2, opponentDirection);
+			m1.join();
 			
-			drawSnake(gameBoard, snake1, PLAYER_SNAKE_COLOR);
-    		drawSnake(gameBoard, snake2, OPPONENT_SNAKE_COLOR);
-            
-			if( isSnakeColide(gameBoard, snake1, snake2) ){
+			drawSnake(gameBoard, snake1, PLAYER_COLOR);
+    		drawSnake(gameBoard, snake2, OPPONENT_COLOR);
+    		
+			if( gameBoard.isSnakeColide(snake1, snake2) ){
 				colisionStatus = PLAYER_COLIDE;
-				win = score1 > score2;	
+				win = score1 > score2;
 				break;
 			} 
-			else if( isSnakeColide(gameBoard, snake2, snake1) ){
+			else if( gameBoard.isSnakeColide(snake2, snake1) ){
 				colisionStatus = OPPONENT_COLIDE;
 				win = score1 >= score2;
 				break;
@@ -152,23 +115,69 @@ bool gameLoop() {
 				drawFood(gameBoard);
 			}
 			
-            sleep( SleepTime );
+			status( score1, score2, pause, autoPilot, colisionStatus );
+            Sleep( SleepTime );
         }
-
-        status( score1, score2, pause, autoPilot, colisionStatus );
-
-        if ( pause ) while ( !kbhit() );
+		else if ( pause ) while ( !kbhit() );
     }
     
     status( score1, score2, pause, autoPilot, colisionStatus );
     
     if(colisionStatus > 0){
     	//cout << (char)7;
-        sleep( 500 );
+        Sleep( 500 );
 	}
 	
-	setCursorPosition(0, MAX_Y + 2);
+	setCursorPosition(0, STATUS_LINE_Y + 1);
     return win;
+}
+
+void handleUserInput(){
+	char c = getch();
+    bool wasPaused = pause;
+    pause = false;
+	
+    if ( c == 'e' || c == 'E' ) {
+        pause = true;
+        autoPilot = true;
+    }
+    else if ( c == 'q' || c == 'Q' ) {
+        autoPilot = false;
+        pause = true;
+    }
+    else if( c == 'o' || c == 'O' ){
+    	system("cls"); 
+    	exit(0);
+	}
+    else {
+    	
+    	int tmpDirection = 0;
+        switch ( c ) {
+            case 'd':
+            case 'D': tmpDirection = RIGHT; break;
+            case 'a':
+            case 'A': tmpDirection = LEFT; break;
+            case 'w':
+            case 'W': tmpDirection = UP; break;
+            case 's':
+            case 'S': tmpDirection = DOWN; break; 
+            case ARROW_KEY_INDICATOR: c = getch(); // Specific Arrow Key
+            	switch( c ){
+                	case 'M': tmpDirection = RIGHT; break;
+                    case 'K': tmpDirection = LEFT; break;
+                    case 'H': tmpDirection = UP; break;
+                    case 'P': tmpDirection = DOWN; break;
+				} break;
+            default: pause = wasPaused;
+        }
+        
+        if( tmpDirection > 0) switch(tmpDirection){
+        	case RIGHT: if( direction != LEFT ) direction = RIGHT; else pause = true; break;
+        	case LEFT : if( direction != RIGHT ) direction = LEFT; else pause = true; break;
+        	case UP : if( direction != DOWN ) direction = UP; else pause = true; break;
+        	case DOWN : if( direction != UP ) direction = DOWN; else pause = true; break;
+		}
+    }
 }
 
 void moveSnake(Snake& snake, int direction){
@@ -183,7 +192,7 @@ void moveSnake(Snake& snake, int direction){
 
 void drawSnake(GameBoard& gameBoard, Snake& snake, int color){
 	setTextColor(color);
-	gameBoard.drawSnake(snake);
+	gameBoard.drawSnake(snake, color);
 	setTextColor(DEFAULT_COLOR);
 }
 
@@ -193,22 +202,21 @@ void drawFood(GameBoard& gameBoard, int color){
 	setTextColor(DEFAULT_COLOR);
 }
 
-bool isSnakeColide(GameBoard& gameBoard, Snake& snake, Snake& otherSnake){
-	
-	if( gameBoard.isBorderCollision(snake) || gameBoard.isSnakeToSnakeCollision(snake, otherSnake) ) { 
-        return 1;
-    }
-    else return 0;
-}
-
 void status( int yourScore, int opponentScore, int gameLoopStatus, bool autoPilot, int colisionStatus) {
 	
     setCursorPosition(STATUS_LINE_X, STATUS_LINE_Y);
     for ( int i = 1; i <= 50; ++i ) cout << " ";
     setCursorPosition(STATUS_LINE_X, STATUS_LINE_Y);
     
-    cout << "YOUR SCORE:" << yourScore << " OPPONENT SOCORE:" << opponentScore << " ";
-    
+    cout << "YOUR SCORE:";
+	setTextColor(PLAYER_COLOR);
+	cout << yourScore;
+    setTextColor(DEFAULT_COLOR);
+	cout << " OPPONENT SOCORE:";
+	setTextColor(OPPONENT_COLOR);
+	cout << opponentScore << " ";
+	setTextColor(DEFAULT_COLOR);
+	
     if ( gameLoopStatus == 0 ) cout << "GameLoop:Running ";
     else if ( gameLoopStatus == 1 ) cout << "GameLoop:Paused ";
     else cout << "GameLoop:GameOver ";
@@ -220,26 +228,47 @@ void status( int yourScore, int opponentScore, int gameLoopStatus, bool autoPilo
 }
 
 void header() {
-    cout << "                         SNAKE GAME " << endl << endl;
-    cout << "RIGHT:D  LEFT:A  UP:W  DOWN:S  PAUSE:OppositeDirection  RESUME:NonOppositeDirection  ";
+    cout << "DUAL SNAKE GAME " << endl;
+    cout << "RIGHT:D," << (char)RIGHT_ARROW_SYMBOL << "  ";
+	cout << "LEFT:A," << (char)LEFT_ARROW_SYMBOL  << "  ";
+	cout << "UP:W," << (char)UP_ARROW_SYMBOL << "  ";
+	cout << "DOWN:S," << (char)DOWN_ARROW_SYMBOL  << "  ";
+	cout << "PAUSE:OppositeDirection  RESUME:NonOppositeDirection  ";
     cout << "AUTOPILOT:E  MANUAL:Q  EXIT:O" << endl << endl;
 }
 
 void welcome() {
+	
     system( "cls" );
-    cout << "********************** WELCOME TO SNAKE GAME ***********************" << endl;
+    cout << "********************** WELCOME TO DUAL SNAKE GAME ***********************" << endl;
+    
     cout << endl << "#Controls {" << endl << endl;
-    cout << "       RIGHT:D" << endl;
-	cout << "        LEFT:A" << endl;
-	cout << "          UP:W"  << endl;
-	cout << "        DOWN:S" << endl;
-	cout << "       PAUSE:Opposite Direction" << endl;
-	cout << "      RESUME:Non Opposite Direction" << endl;
-    cout << "   AUTOPILOT:E" << endl;
-    cout << "      MANUAL:Q" << endl;
-    cout << "        EXIT:O" << endl;
-    cout << "}" << endl;
-    cout << endl << "Press any key to start game..";
+    cout << "       RIGHT: D, " << (char)RIGHT_ARROW_SYMBOL << endl;
+	cout << "        LEFT: A, " << (char)LEFT_ARROW_SYMBOL << endl;
+	cout << "          UP: W, " << (char)UP_ARROW_SYMBOL  << endl;
+	cout << "        DOWN: S, " << (char)DOWN_ARROW_SYMBOL << endl;
+	cout << "       PAUSE: Opposite Direction" << endl;
+	cout << "      RESUME: Non Opposite Direction" << endl;
+    cout << "   AUTOPILOT: E" << endl;
+    cout << "      MANUAL: Q" << endl;
+    cout << "        EXIT: O" << endl;
+    cout << "}" << endl << endl;
+    
+    cout << "#Object {" << endl << endl;
+	cout << "     Player Snake: ";
+	setTextColor(PLAYER_COLOR);
+	cout << (char)BODY_SEGMENT << (char)BODY_SEGMENT << (char)BODY_SEGMENT << (char) HEAD << endl;
+	setTextColor(DEFAULT_COLOR);
+	cout << "   Opponent Snake: ";
+	setTextColor(OPPONENT_COLOR);
+	cout << (char)BODY_SEGMENT << (char)BODY_SEGMENT << (char)BODY_SEGMENT << (char) HEAD << endl;
+	setTextColor(DEFAULT_COLOR);
+	cout << "             Food: ";
+	setTextColor(FOOD_COLOR);
+	cout << (char)FOOD << endl << endl;
+	setTextColor(DEFAULT_COLOR);
+	cout << "}"; 
+    cout << endl << endl << "Press any key to start game..";
     getch();
     system( "cls" );
 }

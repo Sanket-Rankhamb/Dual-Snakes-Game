@@ -2,7 +2,7 @@
 #define snake_H
 
 #define RIGHT 1
-#define LEFT 2
+#define LEFT 2 
 #define UP 3
 #define DOWN 4
 
