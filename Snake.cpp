@@ -1,7 +1,7 @@
 #include "snake.h"
-#include <windows.h>
 #include "Macros.h"
 #include <iostream>
+#include <cstring>
 using namespace std;
 
 Snake::Snake(){
