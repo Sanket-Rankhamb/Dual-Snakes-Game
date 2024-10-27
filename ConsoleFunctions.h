@@ -3,5 +3,5 @@
 
 void setCursorPosition(int x, int y);
 void setTextColor(int color);
-
+void maximizeWindow();
 #endif

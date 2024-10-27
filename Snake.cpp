@@ -166,3 +166,19 @@ int BodySegment::getX(){
 int BodySegment::getY(){
 	return y;
 }
+
+void BodySegment::move(int dir){
+	
+	if(dir == RIGHT){
+		x++;
+	}
+	else if(dir == LEFT){
+		x--;
+	}
+	else if(dir == UP){
+		y--;
+	}
+	else if(dir == DOWN){
+		y++;
+	}
+}

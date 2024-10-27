@@ -13,3 +13,8 @@ void setTextColor(int color) {
     SetConsoleTextAttribute(hConsole, color);
 }
 
+void maximizeWindow(){
+	HWND hwndConsole = GetConsoleWindow();
+	
+	ShowWindow(hwndConsole, SW_SHOWMAXIMIZED);
+}

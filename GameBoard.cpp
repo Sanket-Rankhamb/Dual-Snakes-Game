@@ -1,6 +1,7 @@
 #include "GameBoard.h"
 #include <iostream>
 #include "ConsoleFunctions.h"
+#include <windows.h>
 #include "Macros.h"
 #include <stdlib.h>
 #include <time.h>
@@ -89,7 +90,11 @@ void GameBoard::drawSnake(Snake& snake, int color){
 }
 
 Snake& GameBoard::getSnake(int index){
-	return snake[index];
+	return this->snake[index];
+}
+
+Food& GameBoard::getFood(int index){
+	return this->food[index];
 }
 
 bool GameBoard::isBorderCollision(Snake& snake){
@@ -107,70 +112,129 @@ bool GameBoard::isSnakeToSnakeCollision(Snake& snake, Snake& otherSnake){
 }
 
 bool GameBoard::isSnakeColide(Snake& snake, Snake& otherSnake){
-	
-    return isBorderCollision(snake) || isSnakeToSnakeCollision(snake, otherSnake);
+	return isBorderCollision(snake) || isSnakeToSnakeCollision(snake, otherSnake) || snake.isSelfCollision();
 }
 
-int GameBoard::generateFood(){
-	
-    // Seed the random number generator with the current time
-    srand(time(0));
+int GameBoard::generateFood(Food& food) {
+    int x, y;
+    // Loop until a valid position is found
+    while (true) {
+        // Generate random positions within bounds
+        x = rand() % (maxX - minX) + minX; // x position
+        y = rand() % (maxY - minY) + minY; // y position
 
-    // Generate two random number
-    int x = rand() % (maxX - minX) + minX; // x position
-	int y = rand() % (maxY - minY) + minY; // y position
-	
-	// food should not be generated at the area occupied by snake
-	if( snake[0].isPositionOccupied( x, y ) ) return generateFood();
-	else if( snake[1].isPositionOccupied( x, y ) ) return generateFood();
-	
-	food.x = x;
-	food.y = y;
-	
-	return 0;
+        // Check if the generated position is occupied by the snake or existing food
+        bool occupied = false;
+        for (int i = 0; i < 2; i++) { // Replace '2' with a constant if applicable
+            if (this->snake[i].isPositionOccupied(x, y) || 
+                (this->food[i].x == x && this->food[i].y == y)) {
+                occupied = true;
+                break;
+            }
+        }
+
+        // If the position is not occupied, break out of the loop
+        if (!occupied) {
+            food.x = x;
+            food.y = y;
+            break; // Exit the loop
+        }
+    }
+    
+    return 0;
 }
 
-void GameBoard::drawFood(){
+
+void GameBoard::drawFood(Food& food){
 	setCursorPosition(food.x, food.y);
     cout << (char) FOOD;
 }
 
-bool GameBoard::isSnakeEatingFood(Snake& snake){
+bool GameBoard::isSnakeEatingFood(Snake& snake, Food& food){
 	if( snake.getHeadX() == food.x && snake.getHeadY() == food.y ) return 1;
 	else return 0;
 }
 
+bool GameBoard::isSnakeEatingWrongFood(Snake& snake, Food& food){
+	return isSnakeEatingFood(snake, food);
+}
+
+
 bool GameBoard::isFreePosition(int x, int y){
 	if( x < minX || x > maxX) return 0;
 	else if( y < minY || y > maxY) return 0;
-	
-	future<bool> positionOccupiedFuture = async( &Snake::isPositionOccupied, snake[0], x, y);
-	return ! ( snake[1].isPositionOccupied(x, y) || positionOccupiedFuture.get() );
+	return ! ( snake[0].isPositionOccupied(x, y) || snake[1].isPositionOccupied(x, y) );
 }
 
-int GameBoard::getFreeDirectionForSnake(Snake& snake){
+int GameBoard::getRandomFreeDirectionForSnake(Snake& snake){
+	
 	int hx = snake.getHeadX();
 	int hy = snake.getHeadY();
-	if( isFreePosition(hx + 1, hy) ) return RIGHT;
-	else if( isFreePosition(hx - 1, hy) ) return LEFT;
-	else if( isFreePosition(hx, hy - 1) ) return UP;
-	else if( isFreePosition(hx, hy + 1) ) return RIGHT;
-	else return snake.getDirection();
+	int *possibles = getPossibleDirections( snake.getDirection() );
+	
+	int freeDirs[3];
+	int count = 0;
+	BodySegment tmp;
+	tmp.setPosition(hx, hy);
+	
+	for( int i = 0; i < 3; i++ ){
+		tmp.move( possibles[i] );
+		if( isFreePosition( tmp.getX(), tmp.getY() ) ){
+			freeDirs[count++] = possibles[i];
+		}
+		tmp.setPosition(hx, hy);
+	}
+	
+	if( count == 0 ) return snake.getDirection();
+	else{
+		return freeDirs[ rand() % count ];
+	}
 }
 
-int GameBoard::getAutoDirection(Snake& snake){
+int GameBoard::getAutoDirection(Snake& snake, Food& food, bool isFoodNew, int aiLevel){
 	
 	int d = snake.getDirection(), dir; // new direciton
 	int hx = snake.getHeadX();
 	int hy = snake.getHeadY();
 	int fx = food.x;
 	int fy = food.y;
-
+	
+	if( isFoodNew )
+	{
+		if( aiLevel == EASY ){
+			if( snake.getLength() > 5 ) return getRandomDirection(d); 
+			else return getRandomFreeDirectionForSnake(snake);
+		}
+		else if ( aiLevel == MEDIUM ){
+			return getRandomFreeDirectionForSnake(snake);
+		}
+		else if( aiLevel == HARD )
+		{
+			BodySegment tmp; 
+			tmp.setPosition(hx, hy);
+			tmp.move(d);
+			if( isFreePosition( tmp.getX(), tmp.getY() ) ) return d;
+			else return getRandomFreeDirectionForSnake(snake);
+		}
+	}
+	
+	if( hy != fy && hx != fx ){
+		if( aiLevel == EASY ){
+			if ( snake.getLength() > 5 && rand() % 10 < 2) return getRandomFreeDirectionForSnake(snake);
+		}
+		else if( aiLevel == MEDIUM ){
+			if( snake.getLength() > 10 && rand() % 10 < 2) return getRandomFreeDirectionForSnake(snake);
+		}
+	}
+	
+	
 	if( d == RIGHT ){
 		
 		if(hy == fy){ // s and f at same line
 			if(hx < fx) dir = RIGHT; // f is infront of s
-			else dir = ( (hy == minY || hy != maxY) ? DOWN : UP ); //f is backword of s
+			else{
+			 	dir = ( (hy == minY || hy != maxY) ? DOWN : UP ); //f is backword of s
+			}
 		} 
 		
 		else if(hx == fx) dir = ( (hy < fy ) ? DOWN : UP );// s and f are in same column
@@ -226,30 +290,66 @@ int GameBoard::getAutoDirection(Snake& snake){
 		else dir = LEFT;
 		
 	}
-	
-	// check for desided direction doesn't cause self colision
-	
-	int x, y;
-	if(dir == RIGHT){
-		x = hx + 1;
-		y = hy;
+		
+	BodySegment tmp;
+	tmp.setPosition(hx, hy);
+	tmp.move(dir);
+	if( !isFreePosition( tmp.getX(), tmp.getY() ) ){
+		
+		if( aiLevel == EASY  ) return getRandomDirection(d);
+		else if( aiLevel == MEDIUM ) return getRandomFreeDirectionForSnake(snake);
+		else {
+			tmp.setPosition(hx, hy);
+			tmp.move(d);
+			if( isFreePosition( tmp.getX(), tmp.getY() ) ) return d;
+			else return getRandomFreeDirectionForSnake(snake);
+		}
 	}
-	else if(dir == LEFT){
-		x = hx - 1;
-		y = hy;
-	}
-	else if(dir == UP){
-		x = hx;
-		y = hy - 1;
-	}
-	else if(dir == DOWN){
-		x = hx;
-		y = hy + 1;
-	}
-	
-	if( !isFreePosition(x, y) ) dir = getFreeDirectionForSnake(snake);
 	
 	return dir;
+}
+
+int GameBoard::getRandomDirection(int curDir) {
+    int *possibles = getPossibleDirections(curDir);
+    int d = possibles[rand() % 3];
+    delete[] possibles;
+    return d;
+}
+
+int* GameBoard::getPossibleDirections( int curDir ){
+	
+	int *possibles = new int[3];
+	
+	switch (curDir) {
+        case RIGHT:
+            possibles[0] = UP;
+            possibles[1] = DOWN;
+            possibles[2] = RIGHT;
+            break;
+        case LEFT:
+            possibles[0] = UP;
+            possibles[1] = DOWN;
+            possibles[2] = LEFT;
+            break;
+        case UP:
+            possibles[0] = RIGHT;
+            possibles[1] = LEFT;
+            possibles[2] = UP;
+            break;
+        case DOWN:
+            possibles[0] = RIGHT;
+            possibles[1] = LEFT;
+            possibles[2] = DOWN;
+            break;
+        default:
+            // Handle invalid direction case, should not happen
+            possibles[0] = RIGHT;
+            possibles[1] = LEFT;
+            possibles[2] = UP;
+            break;
+	}
+	
+    return possibles;
 }
 
 

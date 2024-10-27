@@ -29,12 +29,22 @@
 /* colors for snake and fruit */
 #define PLAYER_COLOR 2
 #define OPPONENT_COLOR 4
-#define FOOD_COLOR 6
+#define PLAYER_FOOD_COLOR 3
+#define OPPONENT_FOOD_COLOR 6
 #define DEFAULT_COLOR 15
 
 /* Colision Status */
 #define PLAYER_COLIDE 1
 #define OPPONENT_COLIDE 2
+#define DRAW 3
+
+#define WIN 1
+#define LOST 2
+
+/* Difficulty Levels */
+#define EASY 1
+#define MEDIUM 2
+#define HARD 3
 
 #define GAME_OVER 3
 

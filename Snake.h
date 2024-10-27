@@ -13,6 +13,7 @@ class BodySegment{
 		void setPosition( int x, int y);
 		int getX();
 		int getY();
+		void move(int direction);
 };
 
 class Snake{
